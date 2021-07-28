@@ -74,15 +74,28 @@ pointFinder <- function(fullAngle_v,trigAngle_v, segmentLength_v) {
 ### length - the length of the line that each axis is relative to a standard scale
 ### density - the number of lines in the web, default is to be same as length
 
-numAxes_v <- 5
-lengthAxes_v <- rep(6,5)
-density_v <- 6
+# ### Sparse 5-point
+# numAxes_v <- 5
+# lengthAxes_v <- rep(6,5)
+# density_v <- 6
+# 
+# ### Dense 5-point
+# numAxes_v <- 5
+# lengthAxes_v <- rep(6,5)
+# density_v <- 12
 
-#############
-### SETUP ###~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#############
+### Dense 4-point
+numAxes_v <- 4
+lengthAxes_v <- rep(10,4)
+density_v <- 20
 
-### Get coordinates for eaach of the axes
+
+
+#################
+### MAKE AXES ###~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#################
+
+### Get coordinates for each of the axes
 baseAngle_v <- 360 / numAxes_v
 
 ### Get the full angles
@@ -100,8 +113,80 @@ axisPoints_lsv <- mapply(pointFinder, fullAngles_v, trigAngles_v, lengthAxes_v[2
 ### Prepend the first axis
 axisPoints_lsv <- rlist::list.prepend(axisPoints_lsv, c(0,lengthAxes_v[1]))
 
-plot.new()
-
+### Test plot
+plot(1, type = "n", xlim=c(-10,10), ylim = c(-10,10))
 for (i in 1:length(axisPoints_lsv)) {
   points(x = c(0, axisPoints_lsv[[i]][1]), y = c(0,axisPoints_lsv[[i]][2]), type = 'l')
 }
+
+#################
+### MAKE WEBS ###~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#################
+
+### Have to draw one web for each axis
+### As many lines as there is density.
+### Start at the positive y axis and then go counter-clockwise.
+  ### Point 1 of axis1 goes to pointAxisLength on axis2
+  ### Point 2 of axis1 goes to (point (AxisLength-1)) on axis2
+  ### etc.
+### How to find the points? Same trig thing, but instead of the length being the axis length, it will be a division of it.
+### These are the things that need to be lined up in inverse of each other for the web lines.
+### Will be dependent on the density.
+
+### In this example, there will be 5 sets of 12 lines
+
+### For the first one, each point will be c(0,len/dens), c(0,(len/dens)-1) etc.
+### Second point will be trigValue*len, trigValue*len-1, etc.
+
+### Construct variables
+step_v <- lengthAxes_v / density_v
+sequences_lsv <- mapply(function(x,y) seq(x, y, x), step_v, lengthAxes_v, SIMPLIFY = F)
+
+### Remove first one to add back later
+firstPoints_lsv <- Map(c, rep(0,length(sequences_lsv[[1]])), sequences_lsv[[1]])
+sequences_lsv[[1]] <- NULL
+
+webPoints_lslsv <- list(firstPoints_lsv)
+
+### For each of the axes, find the points
+for (i in 1:length(trigAngles_v)) {
+  
+  ### Get current values
+  currFull_v <- fullAngles_v[i]
+  currTrig_v <- trigAngles_v[i]
+  currSequences_v <- sequences_lsv[[i]]
+  
+  ### Use them to get the points
+  currPoints_lsv <- sapply(currSequences_v, function(x) pointFinder(currFull_v, currTrig_v, x), simplify = F)
+  
+  ### Add to list
+  webPoints_lslsv[[i+1]] <- currPoints_lsv
+  
+}
+
+### Now for each set of points, use the subsequent set to make line segments. For the last set, use the first set.
+for (i in 1:length(webPoints_lslsv)) {
+  
+  ### Get first set
+  currFirstPoints_lsv <- webPoints_lslsv[[i]]
+  
+  ### Get second set
+  if (i == length(webPoints_lslsv)) {
+    currSecondPoints_lsv <- webPoints_lslsv[[1]]
+  } else {
+    currSecondPoints_lsv <- webPoints_lslsv[[i+1]]
+  }
+  
+  ### Reverse second set
+  currSecondPoints_lsv <- rev(currSecondPoints_lsv)
+  
+  ### Plot
+  for (j in 1:length(currFirstPoints_lsv)) {
+    points(x = c(currFirstPoints_lsv[[j]][1], currSecondPoints_lsv[[j]][1]),
+           y = c(currFirstPoints_lsv[[j]][2], currSecondPoints_lsv[[j]][2]),
+           type = 'l')
+  }
+}
+
+
+
