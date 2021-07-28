@@ -31,13 +31,40 @@
         ### II is comprised of 91-180, so you have to subtract 90 once
         ### must subtract twice for III and three times for IV
 
-####################
-### DEPENDENCIES ###~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+##############################
+### DEPENDENCIES/FUNCTIONS ###~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ####################
 
 suppressMessages(library(ggplot2))
 suppressMessages(library(data.table))
 suppressMessages(library(wrh.rUtils))
+
+pointFinder <- function(fullAngle_v,trigAngle_v, segmentLength_v) {
+  #' Point Finder
+  #' @description Find points for line segments of axes that make up astrid.
+  #' @param fullAngle_v The full angle of the current line segment relative to the positive y-axis and going counter-clockwise.
+  #' @param trigAngle_v The angle used to create a 90* triangle in order to use sin/cos to find points. Basically subtract 90 from
+  #' the fullAngle until the remainder is less than 90.
+  #' @param segmentLength_v The distance of the point from the origin, i.e. the length of the line segment. Used to find the x and y.
+  #' @return Returns vector of format c(x,y).
+  
+  ## Convert trigAngle_v from degrees to radians
+  trigAngle_v <- trigAngle_v * pi / 180
+  
+  if (fullAngle_v <= 90) {
+    point_v <- c(-sin(trigAngle_v), cos(trigAngle_v))
+  } else if ((90 < fullAngle_v) & (fullAngle_v <= 180)) {
+    point_v <- c(-cos(trigAngle_v), -sin(trigAngle_v))
+  } else if ((180 < fullAngle_v) & (fullAngle_v <= 270)) {
+    point_v <- c(sin(trigAngle_v), -cos(trigAngle_v))
+  } else {
+    point_v <- c(cos(trigAngle_v), sin(trigAngle_v))
+  }
+  
+  point_v <- point_v * segmentLength_v
+  
+  return(point_v)
+}
 
 #################
 ### ARGUMENTS ###~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -48,6 +75,33 @@ suppressMessages(library(wrh.rUtils))
 ### density - the number of lines in the web, default is to be same as length
 
 numAxes_v <- 5
-lengthAxes_v <- 6
+lengthAxes_v <- rep(6,5)
 density_v <- 6
 
+#############
+### SETUP ###~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#############
+
+### Get coordinates for eaach of the axes
+baseAngle_v <- 360 / numAxes_v
+
+### Get the full angles
+fullAngles_v <- sapply(1:(numAxes_v-1), function(x) baseAngle_v * x)
+
+### Get the trig angles
+trigAngles_v <- sapply(fullAngles_v, function(x) {
+  while(x > 90) x <- x - 90
+  return(x)
+})
+
+### Get the points for the axis segments
+axisPoints_lsv <- mapply(pointFinder, fullAngles_v, trigAngles_v, lengthAxes_v[2:numAxes_v], SIMPLIFY = F)
+
+### Prepend the first axis
+axisPoints_lsv <- rlist::list.prepend(axisPoints_lsv, c(0,lengthAxes_v[1]))
+
+plot.new()
+
+for (i in 1:length(axisPoints_lsv)) {
+  points(x = c(0, axisPoints_lsv[[i]][1]), y = c(0,axisPoints_lsv[[i]][2]), type = 'l')
+}
